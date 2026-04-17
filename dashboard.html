@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fodubu Security Monitor</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      padding: 20px;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .up {
+      color: #22c55e;
+    }
+
+    .down {
+      color: #ef4444;
+    }
+
+    pre {
+      background: black;
+      padding: 10px;
+      border-radius: 5px;
+      overflow: auto;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🛡️ Fodubu Security Dashboard</h1>
+
+<div class="card">
+  <h2>Status: <span class="up">Monitoring Active</span></h2>
+  <p>Real-time server health tracking system</p>
+</div>
+
+<div class="card">
+  <h2>📜 Live Logs</h2>
+  <pre id="logs">Loading...</pre>
+</div>
+
+<script>
+async function loadLogs() {
+  const res = await fetch('/logs');
+  const data = await res.text();
+  document.getElementById("logs").innerText = data;
+}
+
+setInterval(loadLogs, 3000);
+loadLogs();
+</script>
+
+</body>
+</html>

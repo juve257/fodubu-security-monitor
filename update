@@ -1,0 +1,169 @@
+const express = require("express");
+const fs = require("fs");
+const http = require("http");
+const WebSocket = require("ws");
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+const PORT = 3000;
+
+// Serve dashboard
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/dashboard.html");
+});
+
+// Get logs API (optional fallback)
+app.get("/logs", (req, res) => {
+  const logs = fs.existsSync("monitor.log")
+    ? fs.readFileSync("monitor.log", "utf-8").split("\n").slice(-50)
+    : [];
+  res.json(logs);
+});
+
+// WebSocket connection
+wss.on("connection", (ws) => {
+  console.log("Client connected to WebSocket");
+
+  ws.send(JSON.stringify({
+    type: "status",
+    message: "Connected to Fodubu Monitor"
+  }));
+});
+
+// Broadcast function (send data to all clients)
+function broadcast(data) {
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(data));
+    }
+  });
+}
+
+// Export broadcast so monitor can use it
+global.broadcast = broadcast;
+
+server.listen(PORT, () => {
+  console.log(`Dashboard running on http://localhost:${PORT}`);
+});
+const axios = require("axios");
+const config = require("./config");
+const { log } = require("./logger");
+
+async function checkSite() {
+  const start = Date.now();
+
+  try {
+    const res = await axios.get(config.targetUrl, {
+      timeout: config.timeout
+    });
+
+    const latency = Date.now() - start;
+
+    const data = {
+      status: "UP",
+      code: res.status,
+      latency,
+      time: new Date().toISOString()
+    };
+
+    log(`UP ${res.status} ${latency}ms`);
+
+    // 🔥 send real-time update
+    if (global.broadcast) {
+      global.broadcast(data);
+    }
+
+  } catch (err) {
+    const data = {
+      status: "DOWN",
+      error: err.code || "UNKNOWN",
+      time: new Date().toISOString()
+    };
+
+    log(`DOWN ${err.message}`);
+
+    if (global.broadcast) {
+      global.broadcast(data);
+    }
+  }
+}
+
+module.exports = { checkSite };
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fodubu Live Monitor</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      padding: 20px;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .up { color: #22c55e; }
+    .down { color: #ef4444; }
+
+    pre {
+      background: black;
+      padding: 10px;
+      border-radius: 5px;
+      height: 300px;
+      overflow: auto;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🛡️ Fodubu REAL-TIME Monitor</h1>
+
+<div class="card">
+  <h2>Status: <span id="status">Connecting...</span></h2>
+  <p id="info">Waiting for data...</p>
+</div>
+
+<div class="card">
+  <h2>📡 Live Events</h2>
+  <pre id="logs"></pre>
+</div>
+
+<script>
+const statusEl = document.getElementById("status");
+const infoEl = document.getElementById("info");
+const logsEl = document.getElementById("logs");
+
+// WebSocket connection
+const ws = new WebSocket("ws://localhost:3000");
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+
+  if (data.status === "UP") {
+    statusEl.innerHTML = "🟢 ONLINE";
+    statusEl.className = "up";
+    infoEl.innerHTML = `Latency: ${data.latency}ms | Code: ${data.code}`;
+  }
+
+  if (data.status === "DOWN") {
+    statusEl.innerHTML = "🔴 OFFLINE";
+    statusEl.className = "down";
+    infoEl.innerHTML = `Error: ${data.error}`;
+  }
+
+  logsEl.innerHTML += JSON.stringify(data) + "\n";
+};
+</script>
+
+</body>
+</html>
