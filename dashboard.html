@@ -62,3 +62,23 @@ loadLogs();
 
 </body>
 </html>
+<div id="logs"></div>
+<h3>🚫 Blacklisted IPs</h3>
+<div id="blacklist" style="background:#1e293b;padding:10px;border-radius:8px;"></div>async function loadBlacklist() {
+  const res = await fetch("/blacklist");
+  const data = await res.text();
+
+  const lines = data.split("\n").filter(l => l.trim() !== "");
+
+  let html = "";
+
+  lines.forEach(ip => {
+    html += `<div style="color:red;">🚫 ${ip}</div>`;
+  });
+
+  document.getElementById("blacklist").innerHTML = html;
+}
+setInterval(() => {
+  loadLogs();
+  loadBlacklist();
+}, 2000);loadBlacklist();
